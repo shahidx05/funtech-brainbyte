@@ -1,50 +1,45 @@
 const rateLimit = require('express-rate-limit');
+const QuizSettings = require('../models/QuizSettings');
 
 /**
- * Rate limiter for registration endpoint.
- * 10 requests per IP per 15 minutes — prevents spam registrations
- * while allowing reasonable retry behavior.
+ * Dynamic rate limiter middleware.
+ * Checks Mongo QuizSettings to see if rate limiting is enabled & max per IP.
  */
-const registrationLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 5,
-  standardHeaders: true, // Return rate limit info in RateLimit-* headers
-  legacyHeaders: false,
-  message: {
-    success: false,
-    message: 'Too many registration attempts from this IP. Please try again after 15 minutes.',
-  },
-});
+async function dynamicRateLimiter(req, res, next) {
+  try {
+    let settings = await QuizSettings.findOne({});
+    if (!settings) {
+      settings = await QuizSettings.create({ rateLimitEnabled: false, maxRequestsPerIp: 500 });
+    }
 
-/**
- * Rate limiter for quiz submission endpoint.
- * 5 requests per IP per 15 minutes — prevents accidental double-submits
- * from buggy frontend code or network retries.
- */
-const submitLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000,
-  max: 5,
-  standardHeaders: true,
-  legacyHeaders: false,
-  message: {
-    success: false,
-    message: 'Too many submission attempts from this IP. Please try again later.',
-  },
-});
+    // If disabled by admin, skip rate limiting completely
+    if (!settings.rateLimitEnabled) {
+      return next();
+    }
 
-/**
- * General rate limiter applied globally.
- * 100 requests per IP per 15 minutes.
- */
-const generalLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000,
-  max: 100,
-  standardHeaders: true,
-  legacyHeaders: false,
-  message: {
-    success: false,
-    message: 'Too many requests from this IP. Please try again later.',
-  },
-});
+    // Use express-rate-limit logic dynamically or custom IP hit tracking
+    const windowMs = 15 * 60 * 1000;
+    const max = settings.maxRequestsPerIp || 500;
 
-module.exports = { registrationLimiter, submitLimiter, generalLimiter };
+    const limiter = rateLimit({
+      windowMs,
+      max,
+      standardHeaders: true,
+      legacyHeaders: false,
+      message: {
+        success: false,
+        message: `Too many requests from this IP address (Limit: ${max} per 15 min). Ask Admin to adjust or disable Rate Limit in Settings.`,
+      },
+    });
+
+    return limiter(req, res, next);
+  } catch (err) {
+    next(); // Pass through on error so quiz is never blocked accidentally
+  }
+}
+
+module.exports = {
+  registrationLimiter: dynamicRateLimiter,
+  submitLimiter: dynamicRateLimiter,
+  generalLimiter: dynamicRateLimiter,
+};

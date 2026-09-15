@@ -38,7 +38,7 @@ export default function WarningModal({ tabSwitchCount, maxTabSwitches, onDismiss
         </div>
 
         <p className="text-xs text-red-400 font-semibold mb-6">
-          ⚠️ Note: On your 3rd violation ({maxTabSwitches} total), your quiz session will be auto-submitted and locked immediately.
+          ⚠️ Note: On your 4th violation (warning {tabSwitchCount} of {maxTabSwitches - 1}), your quiz session will be auto-submitted and locked immediately.
         </p>
 
         <button

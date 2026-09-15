@@ -19,9 +19,61 @@ export default function AdminDashboard({ adminSecret, onLogout }) {
 
   const headers = { 'x-admin-secret': adminSecret };
 
+  const [isLive, setIsLive] = useState(false);
+  const [togglingLive, setTogglingLive] = useState(false);
+
+  const [rateLimitEnabled, setRateLimitEnabled] = useState(false);
+  const [maxRequestsPerIp, setMaxRequestsPerIp] = useState(500);
+  const [savingSettings, setSavingSettings] = useState(false);
+
+  const fetchQuizSettings = async () => {
+    try {
+      const res = await axios.get('/admin/quiz-settings', { headers });
+      if (res.data && res.data.success) {
+        const s = res.data.data.settings;
+        setIsLive(s.isLive);
+        setRateLimitEnabled(s.rateLimitEnabled ?? false);
+        setMaxRequestsPerIp(s.maxRequestsPerIp ?? 500);
+      }
+    } catch (e) {}
+  };
+
+  const handleToggleLive = async () => {
+    setTogglingLive(true);
+    try {
+      const res = await axios.put('/admin/quiz-toggle-live', { isLive: !isLive }, { headers });
+      if (res.data && res.data.success) {
+        setIsLive(res.data.data.settings.isLive);
+      }
+    } catch (err) {
+      console.error('Failed to toggle live status');
+    } finally {
+      setTogglingLive(false);
+    }
+  };
+
+  const handleSaveSettings = async () => {
+    setSavingSettings(true);
+    try {
+      const res = await axios.put(
+        '/admin/quiz-settings',
+        { rateLimitEnabled, maxRequestsPerIp: Number(maxRequestsPerIp) },
+        { headers }
+      );
+      if (res.data && res.data.success) {
+        alert('Rate limit settings saved successfully!');
+      }
+    } catch (err) {
+      alert('Failed to save settings');
+    } finally {
+      setSavingSettings(false);
+    }
+  };
+
   // Fetch Data based on active tab
   const fetchData = async () => {
     setLoading(true);
+    fetchQuizSettings();
     try {
       if (activeTab === 'leaderboard') {
         const res = await axios.get('/admin/results', { headers });
@@ -52,12 +104,56 @@ export default function AdminDashboard({ adminSecret, onLogout }) {
   }, [activeTab]);
 
   const handleDeleteQuestion = async (id) => {
-    if (!window.confirm('Are you sure you want to delete this question?')) return;
     try {
       await axios.delete(`/admin/questions/${id}`, { headers });
       fetchData();
     } catch (err) {
-      alert('Failed to delete question');
+      console.error('Failed to delete question');
+    }
+  };
+
+  const handleToggleBlockParticipant = async (id) => {
+    try {
+      await axios.put(`/admin/participants/${id}/toggle-block`, {}, { headers });
+      fetchData();
+    } catch (err) {
+      console.error('Failed to toggle block participant');
+    }
+  };
+
+  const handleResetParticipantScore = async (id, name) => {
+    try {
+      await axios.put(`/admin/participants/${id}/reset`, {}, { headers });
+      fetchData();
+    } catch (err) {
+      console.error('Failed to reset participant score');
+    }
+  };
+
+  const handleDeleteParticipant = async (id, name) => {
+    try {
+      await axios.delete(`/admin/participants/${id}`, { headers });
+      fetchData();
+    } catch (err) {
+      console.error('Failed to delete participant');
+    }
+  };
+
+  const handleClearAllScores = async () => {
+    try {
+      await axios.post('/admin/reset-scores', {}, { headers });
+      fetchData();
+    } catch (err) {
+      console.error('Failed to clear all scores');
+    }
+  };
+
+  const handleDeleteAllParticipants = async () => {
+    try {
+      await axios.delete('/admin/participants', { headers });
+      fetchData();
+    } catch (err) {
+      console.error('Failed to delete all participants');
     }
   };
 
@@ -88,6 +184,20 @@ export default function AdminDashboard({ adminSecret, onLogout }) {
         </div>
 
         <div className="flex items-center space-x-3">
+          {/* Quiz Live Switch */}
+          <button
+            onClick={handleToggleLive}
+            disabled={togglingLive}
+            className={`px-4 py-2 rounded-xl text-xs font-bold border transition flex items-center space-x-2 cursor-pointer ${
+              isLive
+                ? 'bg-emerald-950/80 border-emerald-500/50 text-emerald-300 hover:bg-emerald-900/80 shadow-lg shadow-emerald-500/10'
+                : 'bg-amber-950/80 border-amber-500/50 text-amber-300 hover:bg-amber-900/80 shadow-lg shadow-amber-500/10'
+            }`}
+          >
+            <span className={`w-2.5 h-2.5 rounded-full ${isLive ? 'bg-emerald-400 animate-pulse' : 'bg-amber-400'}`} />
+            <span>{isLive ? 'QUIZ IS LIVE' : 'QUIZ IS NOT LIVE'}</span>
+          </button>
+
           <button
             onClick={fetchData}
             className="p-2.5 rounded-xl border border-slate-800 bg-slate-950 text-slate-400 hover:text-white transition cursor-pointer"
@@ -141,6 +251,18 @@ export default function AdminDashboard({ adminSecret, onLogout }) {
         >
           <HelpCircle className="w-4 h-4 text-indigo-400" />
           <span>Questions CRUD ({questions.length})</span>
+        </button>
+
+        <button
+          onClick={() => setActiveTab('settings')}
+          className={`flex items-center space-x-2 px-4 py-2.5 rounded-xl text-xs font-semibold transition cursor-pointer ${
+            activeTab === 'settings'
+              ? 'bg-purple-950/80 border border-purple-500/50 text-purple-300 shadow-lg shadow-purple-500/10'
+              : 'text-slate-400 hover:text-slate-200 hover:bg-slate-900/60'
+          }`}
+        >
+          <Lock className="w-4 h-4 text-emerald-400" />
+          <span>Rate Limit Settings</span>
         </button>
       </div>
 
@@ -211,19 +333,59 @@ export default function AdminDashboard({ adminSecret, onLogout }) {
       {/* Tab 2: Participants */}
       {activeTab === 'participants' && (
         <div className="space-y-4">
-          <div className="grid grid-cols-3 gap-4">
-            <div className="p-4 rounded-xl bg-slate-900 border border-slate-800">
-              <p className="text-xs text-slate-400">Total Registered</p>
-              <p className="text-2xl font-bold text-slate-100 mt-1">{stats.totalRegistered || participants.length}</p>
+          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+            <div className="grid grid-cols-4 gap-4 flex-1">
+              <div className="p-4 rounded-xl bg-slate-900 border border-slate-800">
+                <p className="text-xs text-slate-400">Total Registered</p>
+                <p className="text-2xl font-bold text-slate-100 mt-1">{stats.totalRegistered || participants.length}</p>
+              </div>
+              <div className="p-4 rounded-xl bg-slate-900 border border-slate-800">
+                <p className="text-xs text-slate-400">Submitted</p>
+                <p className="text-2xl font-bold text-emerald-400 mt-1">{stats.totalSubmitted || 0}</p>
+              </div>
+              <div className="p-4 rounded-xl bg-slate-900 border border-slate-800">
+                <p className="text-xs text-slate-400">Pending</p>
+                <p className="text-2xl font-bold text-amber-400 mt-1">{stats.totalPending || 0}</p>
+              </div>
+              <div className="p-4 rounded-xl bg-slate-900 border border-slate-800">
+                <p className="text-xs text-slate-400">Disqualified / Blocked</p>
+                <p className="text-2xl font-bold text-red-400 mt-1">{stats.totalBlocked || 0}</p>
+              </div>
             </div>
-            <div className="p-4 rounded-xl bg-slate-900 border border-slate-800">
-              <p className="text-xs text-slate-400">Submitted</p>
-              <p className="text-2xl font-bold text-emerald-400 mt-1">{stats.totalSubmitted || 0}</p>
+
+            {/* Bulk Actions */}
+            <div className="flex items-center space-x-2">
+              <button
+                onClick={handleClearAllScores}
+                className="px-3.5 py-2 rounded-xl bg-amber-950/80 border border-amber-500/40 text-amber-300 hover:bg-amber-900/80 text-xs font-semibold flex items-center space-x-1.5 transition cursor-pointer"
+                title="Reset scores and quiz attempts for all participants so they can retake"
+              >
+                <RefreshCw className="w-3.5 h-3.5" />
+                <span>Reset All Scores</span>
+              </button>
+              <button
+                onClick={handleDeleteAllParticipants}
+                className="px-3.5 py-2 rounded-xl bg-red-950/80 border border-red-500/40 text-red-300 hover:bg-red-900/80 text-xs font-semibold flex items-center space-x-1.5 transition cursor-pointer"
+                title="Wipe out all participants from roster"
+              >
+                <Trash2 className="w-3.5 h-3.5" />
+                <span>Wipe All Users</span>
+              </button>
             </div>
-            <div className="p-4 rounded-xl bg-slate-900 border border-slate-800">
-              <p className="text-xs text-slate-400">Pending</p>
-              <p className="text-2xl font-bold text-amber-400 mt-1">{stats.totalPending || 0}</p>
+          </div>
+
+          <div className="flex items-center justify-between">
+            <div className="relative w-full max-w-sm">
+              <Search className="w-4 h-4 absolute left-3 top-3 text-slate-500" />
+              <input
+                type="text"
+                placeholder="Search by name or email..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="w-full pl-9 pr-4 py-2 bg-slate-900 border border-slate-800 rounded-xl text-xs text-slate-100 placeholder-slate-500"
+              />
             </div>
+            <span className="text-xs text-slate-400 font-mono">{filteredParticipants.length} Participants</span>
           </div>
 
           <div className="bg-slate-900/90 border border-slate-800 rounded-2xl overflow-hidden shadow-xl">
@@ -235,24 +397,61 @@ export default function AdminDashboard({ adminSecret, onLogout }) {
                   <th className="p-4">Roll Number</th>
                   <th className="p-4">Status</th>
                   <th className="p-4">Registered At</th>
+                  <th className="p-4 text-right">Actions</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-800/60">
                 {filteredParticipants.map((p) => (
-                  <tr key={p._id || p.email} className="hover:bg-slate-800/40">
-                    <td className="p-4 font-semibold text-slate-100">{p.name}</td>
+                  <tr key={p._id || p.email} className={`hover:bg-slate-800/40 ${p.isBlocked ? 'bg-red-950/20' : ''}`}>
+                    <td className="p-4 font-semibold text-slate-100">
+                      {p.name}
+                      {p.isBlocked && <span className="ml-2 text-[10px] text-red-400 font-normal">({p.blockedReason || 'Blocked'})</span>}
+                    </td>
                     <td className="p-4 font-mono text-slate-400">{p.email}</td>
                     <td className="p-4 font-mono text-slate-400">{p.rollNumber || '-'}</td>
                     <td className="p-4">
-                      {p.submitted ? (
+                      {p.isBlocked ? (
+                        <span className="px-2.5 py-1 rounded-md bg-red-950 text-red-300 border border-red-500/40 text-[10px] font-bold">🚫 Disqualified</span>
+                      ) : p.submitted ? (
                         <span className="px-2.5 py-1 rounded-md bg-emerald-950 text-emerald-400 border border-emerald-500/30 text-[10px] font-semibold">Completed ({p.score} pts)</span>
                       ) : (
                         <span className="px-2.5 py-1 rounded-md bg-amber-950 text-amber-300 border border-amber-500/30 text-[10px] font-semibold">In Progress</span>
                       )}
                     </td>
                     <td className="p-4 text-slate-400">{new Date(p.registeredAt).toLocaleString()}</td>
+                    <td className="p-4 text-right space-x-2">
+                      <button
+                        onClick={() => handleToggleBlockParticipant(p._id)}
+                        className={`px-2.5 py-1 rounded-lg text-[11px] font-semibold transition cursor-pointer border ${
+                          p.isBlocked
+                            ? 'bg-emerald-950/60 border-emerald-500/30 text-emerald-300 hover:bg-emerald-900/60'
+                            : 'bg-red-950/60 border-red-500/30 text-red-300 hover:bg-red-900/60'
+                        }`}
+                      >
+                        {p.isBlocked ? 'Unblock' : 'Disqualify'}
+                      </button>
+                      <button
+                        onClick={() => handleResetParticipantScore(p._id, p.name)}
+                        className="px-2.5 py-1 rounded-lg bg-amber-950/60 border border-amber-500/30 text-amber-300 hover:bg-amber-900/60 text-[11px] font-semibold transition cursor-pointer"
+                        title="Reset score and allow re-attempt"
+                      >
+                        Reset Score
+                      </button>
+                      <button
+                        onClick={() => handleDeleteParticipant(p._id, p.name)}
+                        className="px-2.5 py-1 rounded-lg bg-slate-950 border border-slate-800 text-slate-400 hover:text-red-400 text-[11px] font-semibold transition cursor-pointer"
+                        title="Remove user from roster"
+                      >
+                        Delete
+                      </button>
+                    </td>
                   </tr>
                 ))}
+                {filteredParticipants.length === 0 && (
+                  <tr>
+                    <td colSpan={6} className="p-8 text-center text-slate-500">No participants registered yet.</td>
+                  </tr>
+                )}
               </tbody>
             </table>
           </div>
@@ -322,6 +521,70 @@ export default function AdminDashboard({ adminSecret, onLogout }) {
                 </div>
               </div>
             ))}
+          </div>
+        </div>
+      )}
+
+      {/* Tab 4: Rate Limit Settings */}
+      {activeTab === 'settings' && (
+        <div className="space-y-6 max-w-2xl bg-slate-900/90 border border-slate-800 rounded-2xl p-6 shadow-xl">
+          <div>
+            <h3 className="font-heading font-bold text-lg text-slate-100">IP Rate Limiting Controls</h3>
+            <p className="text-xs text-slate-400 mt-1 leading-relaxed">
+              Configure how network traffic and IP requests are handled during the quiz competition.
+            </p>
+          </div>
+
+          <div className="space-y-6">
+            {/* Toggle Enable/Disable */}
+            <div className="flex items-center justify-between p-4 rounded-xl bg-slate-950 border border-slate-800">
+              <div>
+                <p className="font-semibold text-xs text-slate-200">Enable IP Rate Limiting</p>
+                <p className="text-[11px] text-slate-500 mt-0.5">
+                  Disable this if multiple participants are sharing the same College WiFi or Lab IP address.
+                </p>
+              </div>
+              <button
+                onClick={() => setRateLimitEnabled(!rateLimitEnabled)}
+                className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
+                  rateLimitEnabled ? 'bg-purple-600' : 'bg-slate-800'
+                }`}
+              >
+                <span
+                  className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
+                    rateLimitEnabled ? 'translate-x-5' : 'translate-x-0'
+                  }`}
+                />
+              </button>
+            </div>
+
+            {/* Max Requests Input */}
+            <div className="space-y-2">
+              <label className="block text-xs font-semibold text-slate-300">
+                Max Requests Allowed Per IP (15-Minute Window)
+              </label>
+              <input
+                type="number"
+                min="10"
+                max="10000"
+                value={maxRequestsPerIp}
+                onChange={(e) => setMaxRequestsPerIp(e.target.value)}
+                disabled={!rateLimitEnabled}
+                className="w-full px-4 py-2.5 bg-slate-950 border border-slate-800 rounded-xl text-xs font-mono text-slate-100 disabled:opacity-40"
+              />
+              <p className="text-[11px] text-slate-500">
+                Recommended: 500–1000 for shared networks, 10–20 for strict anti-bot protection.
+              </p>
+            </div>
+
+            {/* Save Button */}
+            <button
+              onClick={handleSaveSettings}
+              disabled={savingSettings}
+              className="px-6 py-2.5 rounded-xl font-heading font-semibold text-xs text-slate-950 bg-gradient-to-r from-cyan-400 to-indigo-300 hover:from-cyan-300 transition cursor-pointer shadow-lg shadow-cyan-500/10"
+            >
+              {savingSettings ? 'Saving Settings...' : 'Save Configuration'}
+            </button>
           </div>
         </div>
       )}

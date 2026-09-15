@@ -1,7 +1,7 @@
 import React from 'react';
 import { Lock, ShieldX, AlertTriangle, RefreshCw } from 'lucide-react';
 
-export default function LockoutModal({ tabSwitchCount, onRestartClick }) {
+export default function LockoutModal({ tabSwitchCount, onAdminClick }) {
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/95 backdrop-blur-2xl">
       <div className="relative w-full max-w-lg bg-slate-900 border-2 border-red-500/60 rounded-2xl p-6 sm:p-10 shadow-2xl text-center overflow-hidden">
@@ -19,7 +19,7 @@ export default function LockoutModal({ tabSwitchCount, onRestartClick }) {
         
         <div className="inline-flex items-center space-x-2 px-3 py-1 rounded-full bg-red-950/80 border border-red-500/40 text-red-300 text-xs font-semibold mb-6">
           <Lock className="w-3.5 h-3.5" />
-          <span>Maximum Security Violations Reached ({tabSwitchCount}/3)</span>
+          <span>Maximum Security Violations Reached ({tabSwitchCount})</span>
         </div>
 
         <p className="text-sm text-slate-300 mb-6 leading-relaxed">
@@ -41,6 +41,15 @@ export default function LockoutModal({ tabSwitchCount, onRestartClick }) {
           <p className="text-xs text-slate-500">
             If you believe this was an error or system glitch, please contact the FunTech Society invigilators.
           </p>
+
+          <button
+            onClick={() => {
+              if (onAdminClick) onAdminClick();
+            }}
+            className="mt-2 text-xs text-purple-400 hover:text-purple-300 underline font-semibold cursor-pointer"
+          >
+            Invigilator / Admin Portal Access
+          </button>
         </div>
 
       </div>

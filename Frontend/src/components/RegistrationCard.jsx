@@ -63,6 +63,8 @@ const REGISTERED_STUDENTS = [
   { email: 'kt414378@gmail.com', rollNumber: 'BTEC26O1047 ' },
   { email: '26tc1ni94@mitsgwl.ac.in', rollNumber: 'BTTC26O1094' },
   { email: 'dangishriom251@gmail.com', rollNumber: 'BTAM25O1061' },
+  { email: 'himeshbadlani17@gmail.com', rollNumber: 'BTEO24O1019' },
+  
 ];
 
 export default function RegistrationCard({ onRegisterSuccess }) {
@@ -198,7 +200,7 @@ export default function RegistrationCard({ onRegisterSuccess }) {
             {/* Roll Number */}
             <div>
               <label className="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-2">
-                Roll / ID Number <span className="text-slate-500">(Optional)</span>
+                Roll / ID Number <span className="text-cyan-400">*</span>
               </label>
               <div className="relative">
                 <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-500">
@@ -238,7 +240,7 @@ export default function RegistrationCard({ onRegisterSuccess }) {
               <Code2 className="w-3.5 h-3.5 text-cyan-400" />
               <span>Single Session Attempt Allowed</span>
             </div>
-            <span>FunTech Society</span>
+            <span>FunTech Club</span>
           </div>
 
         </div>

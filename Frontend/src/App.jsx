@@ -15,9 +15,12 @@ import AdminDashboard from './components/Admin/AdminDashboard.jsx';
 import { useAntiCheat } from './hooks/useAntiCheat.js';
 import { ShieldAlert, Loader2, RefreshCw } from 'lucide-react';
 
+import WaitingRoom from './components/WaitingRoom.jsx';
+
 export default function App() {
-  // Application Stage: 'REGISTER' | 'RULES' | 'QUIZ' | 'LOCKOUT' | 'RESULT' | 'ADMIN_LOGIN' | 'ADMIN_DASHBOARD'
+  // Application Stage: 'REGISTER' | 'RULES' | 'WAIT_LIVE' | 'QUIZ' | 'LOCKOUT' | 'RESULT' | 'ADMIN_LOGIN' | 'ADMIN_DASHBOARD'
   const [stage, setStage] = useState('REGISTER');
+  const [previousStage, setPreviousStage] = useState('REGISTER');
   const [adminSecret, setAdminSecret] = useState('');
 
   
@@ -43,8 +46,15 @@ export default function App() {
 
     if (savedToken && savedParticipant) {
       try {
+        const parsed = JSON.parse(savedParticipant);
         setJwtToken(savedToken);
-        setParticipant(JSON.parse(savedParticipant));
+        setParticipant(parsed);
+
+        if (parsed.isBlocked || localStorage.getItem('funtech_quiz_is_blocked') === 'true') {
+          setStage('LOCKOUT');
+          return;
+        }
+
         // Check if answers saved locally
         const savedAnswers = localStorage.getItem('funtech_quiz_answers');
         if (savedAnswers) {
@@ -56,17 +66,36 @@ export default function App() {
     }
   }, []);
 
+  // Auto-check live status periodically if waiting in room
+  useEffect(() => {
+    if (stage !== 'WAIT_LIVE') return;
+    const interval = setInterval(() => {
+      startQuizSession();
+    }, 5000);
+    return () => clearInterval(interval);
+  }, [stage, jwtToken]);
+
   // Submit Handler Callback for Anti-Cheat Lockout
   const handleLockoutSubmit = useCallback(async (finalTabSwitches) => {
+    localStorage.setItem('funtech_quiz_is_blocked', 'true');
     setStage('LOCKOUT');
+    try {
+      if (jwtToken) {
+        await axios.post(
+          '/api/quiz/block-self',
+          { reason: `Exceeded security violation limit (${finalTabSwitches} tab switches)` },
+          { headers: { Authorization: `Bearer ${jwtToken}` } }
+        );
+      }
+    } catch (e) {}
     await submitAnswers(true);
-  }, []);
+  }, [jwtToken]);
 
   // Anti-Cheat Hook initialization
   const isAntiCheatActive = stage === 'QUIZ';
   const antiCheat = useAntiCheat({
     active: isAntiCheatActive,
-    maxTabSwitches: 3,
+    maxTabSwitches: 4,
     onViolationThresholdReached: (finalCount) => {
       handleLockoutSubmit(finalCount);
     },
@@ -81,10 +110,17 @@ export default function App() {
     setAnswersMap({});
     localStorage.removeItem('funtech_quiz_answers');
     localStorage.removeItem('funtech_quiz_start_time');
+    localStorage.removeItem('funtech_quiz_is_blocked');
 
     localStorage.setItem('funtech_quiz_token', token);
     localStorage.setItem('funtech_quiz_participant', JSON.stringify(newParticipant));
-    setStage('RULES');
+
+    if (newParticipant.isBlocked) {
+      localStorage.setItem('funtech_quiz_is_blocked', 'true');
+      setStage('LOCKOUT');
+    } else {
+      setStage('RULES');
+    }
   };
 
   // Fetch Quiz Questions
@@ -100,6 +136,10 @@ export default function App() {
       });
 
       if (res.data && res.data.success) {
+        // Participant is clear and unblocked: reset anti-cheat counter from 0 to 4
+        localStorage.removeItem('funtech_quiz_is_blocked');
+        antiCheat.resetViolations();
+
         const { questions: fetchedQuestions, timeLimitSeconds: limit } = res.data.data;
         setQuestions(fetchedQuestions || []);
         setTimeLimitSeconds(limit || 1800);
@@ -117,7 +157,18 @@ export default function App() {
         antiCheat.enterFullscreen();
       }
     } catch (err) {
-      if (err.response && err.response.status === 403) {
+      if (err.response && err.response.status === 401) {
+        // Participant was wiped by admin: clear local storage & return to registration
+        localStorage.clear();
+        setParticipant(null);
+        setJwtToken('');
+        setStage('REGISTER');
+      } else if (err.response && err.response.data && err.response.data.isBlocked) {
+        localStorage.setItem('funtech_quiz_is_blocked', 'true');
+        setStage('LOCKOUT');
+      } else if (err.response && err.response.data && err.response.data.isNotLive) {
+        setStage('WAIT_LIVE');
+      } else if (err.response && err.response.status === 403) {
         setErrorMsg('You have already submitted this quiz attempt.');
       } else if (err.response && err.response.data && err.response.data.message) {
         setErrorMsg(err.response.data.message);
@@ -231,8 +282,9 @@ export default function App() {
         stage={stage}
         onToggleAdmin={() => {
           if (stage === 'ADMIN_DASHBOARD' || stage === 'ADMIN_LOGIN') {
-            setStage('REGISTER');
+            setStage(previousStage);
           } else {
+            setPreviousStage(stage);
             setStage(adminSecret ? 'ADMIN_DASHBOARD' : 'ADMIN_LOGIN');
           }
         }}
@@ -269,7 +321,7 @@ export default function App() {
               setAdminSecret(secret);
               setStage('ADMIN_DASHBOARD');
             }}
-            onCancel={() => setStage('REGISTER')}
+            onCancel={() => setStage(previousStage)}
           />
         )}
 
@@ -279,7 +331,7 @@ export default function App() {
             adminSecret={adminSecret}
             onLogout={() => {
               setAdminSecret('');
-              setStage('REGISTER');
+              setStage(previousStage);
             }}
           />
         )}
@@ -298,6 +350,15 @@ export default function App() {
               localStorage.clear();
               setStage('REGISTER');
             }}
+          />
+        )}
+
+        {/* 2.5 Waiting Room Screen (Quiz Not Live Yet) */}
+        {stage === 'WAIT_LIVE' && (
+          <WaitingRoom
+            participant={participant}
+            onCheckLive={startQuizSession}
+            checking={loading}
           />
         )}
 
@@ -362,6 +423,7 @@ export default function App() {
         {stage === 'LOCKOUT' && (
           <LockoutModal
             tabSwitchCount={antiCheat.tabSwitchCount}
+            onAdminClick={() => setStage(adminSecret ? 'ADMIN_DASHBOARD' : 'ADMIN_LOGIN')}
           />
         )}
 
@@ -377,7 +439,7 @@ export default function App() {
 
       {/* Footer */}
       <footer className="py-4 border-t border-slate-800/60 text-center text-xs text-slate-500">
-        <p>© 2026 FunTech Student Society. All Rights Reserved. Built for BrainByte Quiz Event.</p>
+        <p>© 2026 FunTech Club MITS. All Rights Reserved. Built for BrainByte Quiz Event.</p>
       </footer>
     </div>
   );

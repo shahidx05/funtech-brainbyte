@@ -1,6 +1,26 @@
 const Participant = require('../models/Participant');
 const Question = require('../models/Question');
+const QuizSettings = require('../models/QuizSettings');
 const generateToken = require('../utils/generateToken');
+
+/**
+ * GET /api/quiz-status
+ * Public endpoint to check if quiz is currently live.
+ */
+async function getQuizStatus(req, res) {
+  let settings = await QuizSettings.findOne({});
+  if (!settings) {
+    settings = await QuizSettings.create({ isLive: false });
+  }
+
+  res.status(200).json({
+    success: true,
+    data: {
+      isLive: settings.isLive,
+      title: settings.title,
+    },
+  });
+}
 
 /**
  * POST /api/register
@@ -16,6 +36,13 @@ async function register(req, res) {
   const existing = await Participant.findOne({ email: email.toLowerCase() });
 
   if (existing) {
+    if (existing.isBlocked) {
+      return res.status(403).json({
+        success: false,
+        message: 'Your account has been disqualified and blocked due to anti-cheat security violations.',
+        isBlocked: true,
+      });
+    }
     if (existing.submitted) {
       return res.status(409).json({
         success: false,
@@ -75,6 +102,29 @@ async function register(req, res) {
  * Requires JWT authentication.
  */
 async function getQuiz(req, res) {
+  // Check if participant is blocked
+  if (req.participant.isBlocked) {
+    return res.status(403).json({
+      success: false,
+      message: 'Your account has been disqualified and blocked due to security violations.',
+      isBlocked: true,
+    });
+  }
+
+  // Check if quiz is currently live
+  let settings = await QuizSettings.findOne({});
+  if (!settings) {
+    settings = await QuizSettings.create({ isLive: false });
+  }
+
+  if (!settings.isLive) {
+    return res.status(403).json({
+      success: false,
+      message: 'The quiz is not live yet. Please wait for the admin to start the quiz.',
+      isNotLive: true,
+    });
+  }
+
   // Check if participant has already submitted
   if (req.participant.submitted) {
     return res.status(403).json({
@@ -215,6 +265,28 @@ async function submitAnswers(req, res) {
   });
 }
 
+/**
+ * POST /api/quiz/block-self
+ * Called by frontend when anti-cheat lockout threshold is reached.
+ * Permanently sets isBlocked: true in Mongo.
+ */
+async function blockSelf(req, res) {
+  const { reason } = req.body;
+  const participantId = req.participant._id;
+
+  await Participant.findByIdAndUpdate(participantId, {
+    $set: {
+      isBlocked: true,
+      blockedReason: reason || 'Anti-cheat violation threshold reached (4 tab switches/defocus)',
+    },
+  });
+
+  res.status(200).json({
+    success: true,
+    message: 'Participant account locked and blocked',
+  });
+}
+
 // ── Helper ─────────────────────────────────────────────────
 /**
  * Fisher-Yates shuffle (in-place, returns mutated array).
@@ -227,4 +299,4 @@ function shuffleArray(arr) {
   return arr;
 }
 
-module.exports = { register, getQuiz, submitAnswers };
+module.exports = { getQuizStatus, register, getQuiz, submitAnswers, blockSelf };

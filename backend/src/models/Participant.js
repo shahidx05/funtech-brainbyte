@@ -40,6 +40,14 @@ const participantSchema = new mongoose.Schema(
       type: Date,
       default: null,
     },
+    isBlocked: {
+      type: Boolean,
+      default: false,
+    },
+    blockedReason: {
+      type: String,
+      default: null,
+    },
     // Embedded answers — justified in README.
     // For a single-attempt quiz with ≤150 users and ≤50 questions,
     // embedding keeps the atomic submit as a single findOneAndUpdate
@@ -87,6 +95,8 @@ participantSchema.methods.toPublicJSON = function () {
     score: this.score,
     timeTakenSeconds: this.timeTakenSeconds,
     submittedAt: this.submittedAt,
+    isBlocked: this.isBlocked,
+    blockedReason: this.blockedReason,
   };
 };
 

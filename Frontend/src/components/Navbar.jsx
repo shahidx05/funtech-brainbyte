@@ -25,7 +25,7 @@ export default function Navbar({ participant, stage, onToggleAdmin }) {
   }, []);
 
   return (
-    <header className="sticky top-0 z-40 w-full border-b border-slate-800/80 bg-slate-950/80 backdrop-blur-md">
+    <header className="sticky top-0 z-50 w-full border-b border-slate-800/80 bg-slate-950/80 backdrop-blur-md">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
         
         {/* Brand Logo & Name */}
@@ -57,27 +57,8 @@ export default function Navbar({ participant, stage, onToggleAdmin }) {
           </div>
         </div>
 
-        {/* Center / System Status */}
-        <div className="hidden md:flex items-center space-x-4 bg-slate-900/60 px-3 py-1.5 rounded-full border border-slate-800">
-          <div className="flex items-center space-x-2">
-            <span className="relative flex h-2 w-2">
-              <span className={`animate-ping absolute inline-flex h-full w-full rounded-full opacity-75 ${
-                serverHealth === 'healthy' ? 'bg-emerald-400' : 'bg-amber-400'
-              }`}></span>
-              <span className={`relative inline-flex rounded-full h-2 w-2 ${
-                serverHealth === 'healthy' ? 'bg-emerald-500' : 'bg-amber-500'
-              }`}></span>
-            </span>
-            <span className="text-xs font-medium text-slate-300 capitalize">
-              Node API: {serverHealth}
-            </span>
-          </div>
-          <span className="text-slate-700">|</span>
-          <div className="flex items-center space-x-1.5 text-xs text-slate-400">
-            <ShieldCheck className="w-3.5 h-3.5 text-cyan-400" />
-            <span>Anti-Cheat Guard v2.4</span>
-          </div>
-        </div>
+        
+        
 
         {/* Participant Profile / Stage Status & Admin Switcher */}
         <div className="flex items-center space-x-3">

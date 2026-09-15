@@ -37,7 +37,7 @@ async function verifyToken(req, res, next) {
 
     // Verify participant still exists in DB
     const participant = await Participant.findById(decoded.id).select(
-      '_id email name submitted'
+      '_id email name submitted isBlocked'
     );
 
     if (!participant) {

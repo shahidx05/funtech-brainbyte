@@ -183,11 +183,18 @@ export function useAntiCheat({
     enterFullscreen();
   };
 
+  const resetViolations = useCallback(() => {
+    setTabSwitchCount(0);
+    setIsBlocked(false);
+    setShowWarningModal(false);
+  }, []);
+
   return {
     tabSwitchCount,
     maxTabSwitches,
     showWarningModal,
     dismissWarningModal,
+    resetViolations,
     isBlocked,
     isFullscreen,
     enterFullscreen,
