@@ -6,9 +6,17 @@
   "scripts": {
     "start": "node src/server.js",
     "dev": "nodemon src/server.js",
-    "seed": "node src/utils/seedQuestions.js"
+    "seed": "node src/utils/seedQuestions.js",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:concurrency": "node tests/stress/concurrencySubmit.js"
   },
-  "keywords": ["quiz", "backend", "express", "mongodb"],
+  "keywords": [
+    "quiz",
+    "backend",
+    "express",
+    "mongodb"
+  ],
   "author": "",
   "license": "ISC",
   "dependencies": {
@@ -23,6 +31,9 @@
     "zod": "^3.24.2"
   },
   "devDependencies": {
-    "nodemon": "^3.1.9"
+    "mongodb-memory-server": "^11.2.0",
+    "nodemon": "^3.1.9",
+    "supertest": "^7.2.2",
+    "vitest": "^5.0.1"
   }
 }

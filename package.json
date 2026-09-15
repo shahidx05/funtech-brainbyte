@@ -1,0 +1,22 @@
+{
+  "name": "funtech-brainbyte-root",
+  "version": "1.0.0",
+  "private": true,
+  "description": "FunTech BrainByte Quiz Web Application Monorepo",
+  "scripts": {
+    "install:backend": "npm --prefix backend install",
+    "install:frontend": "npm --prefix Frontend install",
+    "install:all": "npm run install:backend && npm run install:frontend",
+    "dev:backend": "npm --prefix backend run dev",
+    "dev:frontend": "npm --prefix Frontend run dev",
+    "seed": "npm --prefix backend run seed",
+    "test": "npm run test:backend && npm run test:frontend",
+    "test:backend": "npm --prefix backend test",
+    "test:frontend": "npm --prefix Frontend test",
+    "test:concurrency": "npm --prefix backend run test:concurrency",
+    "test:e2e": "npx playwright test"
+  },
+  "keywords": ["quiz", "brainbyte", "funtech"],
+  "author": "FunTech Society",
+  "license": "ISC"
+}

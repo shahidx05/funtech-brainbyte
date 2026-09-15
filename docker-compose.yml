@@ -1,0 +1,55 @@
+services:
+  mongo:
+    image: mongo:7.0
+    container_name: brainbyte-mongo
+    restart: unless-stopped
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongo_data:/data/db
+    networks:
+      - quiz-net
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: brainbyte-backend
+    restart: unless-stopped
+    ports:
+      - "5000:5000"
+    environment:
+      - PORT=5000
+      - NODE_ENV=development
+      - MONGODB_URI=mongodb://mongo:27017/quiz-app
+      - MONGO_POOL_SIZE=50
+      - JWT_SECRET=84ee20a695d7b1a0e2edd0c60d8aa40fe7180c5521991a970884b3f128aa96b4
+      - JWT_EXPIRES_IN=60m
+      - ADMIN_SECRET=14c0f30cbc361e236d70f6f03d7c1de694b66be4a352b1b9faaa35c984e65257
+      - CORS_ORIGIN=http://localhost:3000
+      - QUIZ_TIME_LIMIT_SECONDS=1800
+      - SHUFFLE_QUESTIONS=false
+    depends_on:
+      - mongo
+    networks:
+      - quiz-net
+
+  frontend:
+    build:
+      context: ./Frontend
+      dockerfile: Dockerfile
+    container_name: brainbyte-frontend
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    depends_on:
+      - backend
+    networks:
+      - quiz-net
+
+volumes:
+  mongo_data:
+
+networks:
+  quiz-net:
+    driver: bridge
